@@ -1,7 +1,11 @@
-const frequencyPerBin = 22000 / 1024; // Total frequency capture divided by number of bins
-const minFrequencyDetected = 16500; // Don't check frequencies below this
+const emitFrequency = 1250;
+const plusMinusFreqneucy = 50;
+
+const frequencyPerBin = 22050 / 1024; // Total frequency capture divided by number of bins
+const minFrequencyDetected = emitFrequency - plusMinusFreqneucy; // Don't check frequencies below this
 const minBin = minFrequencyDetected / frequencyPerBin; // Don't check bins below this
-const minAmplitudeDetected = 0.25; // Minimum amplitude to consider
+const maxFrequencyDetected = emitFrequency + plusMinusFreqneucy; // Don't check frequencies above this
+const minAmplitudeDetected = 0.75; // Minimum amplitude to consider
 
 let mic;
 let fft;
