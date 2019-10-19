@@ -17,11 +17,15 @@
       let source = null;
       let state = null;
       let threshold = 0;
-      let fireflyTime = 0;
+      let fireflyTime = Math.random() * fireflyPeriod;
 
       function setState(newState) {
         state = newState;
         document.getElementById("state").innerText = state;
+      }
+
+      function go() {
+        setState("listening");
       }
 
       function setup() {
@@ -41,7 +45,7 @@
 
               setState("calibrating");
               setTimeout(function() {
-                setState("listening");
+                setState("ready");
               }, 5000);
               listen();
             }).catch(function(err) {
@@ -131,27 +135,35 @@
             varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
             threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
             console.log("Threshold: ", threshold);
-          } else if (state === "listening" || state === "tone"){
-            // Check for tones
-            if (dataArray[bucket] > threshold) {
-              ticksAboveThreshold++;
-              if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
-                setState("tone");
-                fireflyTime = fireflyTime + toneIncrement;
-                console.log("Tone!");
+          } else {
+            if (state === "listening" || state === "tone") {
+              // Check for tones
+              if (dataArray[bucket] > threshold) {
+                ticksAboveThreshold++;
+                if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
+                  setState("tone");
+                  fireflyTime = fireflyTime + toneIncrement;
+                  console.log("Tone!");
+                }
+              } else {
+                setState("listening");
+                ticksAboveThreshold = 0;
               }
-            } else {
-              setState("listening");
-              ticksAboveThreshold = 0;
             }
 
             // Possibly flash
             if (fireflyTime > fireflyPeriod) {
               fireflyTime = 0;
-              setState("flashing");
-              emit(function () {
-                setTimeout(function () { setState("listening") }, 500);
-              });
+              console.log("Flashing");
+
+              if (state === "listening" || state === "tone") {
+                setState("flashing");
+                emit(function () {
+                  setTimeout(function () {
+                    setState("listening")
+                  }, 500);
+                });
+              }
             } else {
               fireflyTime++;
             }
@@ -164,7 +176,7 @@
   </head>
   <body>
     <div><button id="setup" onclick="setup()">setup!</button></div>
-    <div><button onclick="emit()">emit!</button></div>
+    <div><button onclick="go()">go!</button></div>
 
     <h2 id="state"></h2>
     <canvas id="oscilloscope"></canvas>
