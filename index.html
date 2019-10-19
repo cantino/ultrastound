@@ -2,9 +2,12 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
+        <script src="./third-party/Tone.js"></script>
         <script src="play_sound.js"></script>
     </head>
     <body>
-        
+        <div>Frequency <span id="frequencyDisplay">440</span></div>
+        <div><input id="frequencySlider" type="range" min="1" max="20000" value="44" style="width: 80%" oninput="sliderChanged()"></div>
+        <div><button onclick="clicked()">sound!</button></div>
     </body>
 </html>
