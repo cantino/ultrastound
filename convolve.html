@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html data-ng-app="audio_circle">
+  <head>
+    <meta charset="UTF-8">
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="third-party/angular.js"></script>
+    <script>
+      audio_circle = angular.module('audio_circle', []);
+
+      audio_circle.controller('AudioCircle', ['$scope', function($scope) {
+        var bufferSize = 1024;
+        var convolutionWindow = 64;
+        var chirpFrequency = 10000;
+        var chirpLength = 4 * 44.1;
+
+        $scope.main_text = 'Calibrating...'
+
+        var state, chirpLatency, sample, lastChirpTime, nextChirpTime;
+        var context, soundSource, microphone, convolver, processor, prevInputBuffer; // global because of Chrome bugs
+        state = 'init';
+        sample = 0;
+        chirpLatency = 0;
+        nextChirpTime = null;
+        var numSelfChirpsLeft = 3;
+        var expectedSelfChirpTime;
+        var selfChirpTimer = null;
+        var selfChirpEstimates = [];
+
+        function selfChirp() {
+			    console.log("selfChirp");
+          if (selfChirpTimer !== null) {
+            clearTimeout(selfChirpTimer);
+          }
+          expectedSelfChirpTime = sample + chirpLength * 100;
+          chirp(expectedSelfChirpTime);
+          state = 'determine-own-latency';
+          selfChirpTimer = setTimeout(function() {
+            selfChirp();
+          }, 2000);
+        }
+
+        var rttInitTimeA, syncTime;
+        var numSyncTimesLeft = 3;
+        var syncTimes = [];
+
+        $scope.initiateA = function() {
+          if (numSyncTimesLeft === 0) {
+            syncTimes.sort();
+            syncTime = syncTimes[Math.floor(syncTimes.length / 2)];
+            state = 'dead-a';
+            $scope.main_text = 'You are free to move about the cabin'
+            $scope.$digest();
+          } else {
+            rttInitTimeA = sample + chirpLatency * 2;
+            chirp(rttInitTimeA);
+            state = 'rtt-wait-own-a';
+            numSyncTimesLeft--;
+
+            $scope.main_text = 'Calibrating with B...'
+          }
+        }
+
+        $scope.initiateB = function() {
+          if (numSyncTimesLeft === 0) {
+            syncTimes.sort();
+            syncTime = syncTimes[Math.floor(syncTimes.length / 2)];
+            state = 'dead-b';
+          } else {
+            state = 'rtt-wait-other-b';
+            numSyncTimesLeft--;
+
+            $scope.main_text = 'Calibrating with A...'
+          }
+        }
+
+        function chirp(time) {
+          nextChirpTime = time - chirpLatency;
+        }
+
+        function onChirp() {
+    			console.log("onChirp");
+          if (state === 'determine-own-latency') {
+            selfChirpEstimates.push(sample - expectedSelfChirpTime);
+            numSelfChirpsLeft--;
+            if (numSelfChirpsLeft == 0) {
+              selfChirpEstimates.sort();
+              chirpLatency = selfChirpEstimates[Math.floor(selfChirpEstimates.length / 2)];
+		      	  console.log("self chirpLatency = " + chirpLatency);
+              clearTimeout(selfChirpTimer);
+              state = 'rtt-init';
+              $scope.main_text = 'Choose your destiny';
+              $scope.$digest();
+            } else {
+              selfChirp();
+            }
+          } else if (state === 'rtt-wait-own-a') {
+            state = 'rtt-wait-other-a';
+          } else if (state === 'rtt-wait-other-a') {
+            syncTimes.push(rttInitTimeA + Math.round((sample - rttInitTimeA) / 2));
+            state = 'limbo';
+            setTimeout($scope.initiateA, 1000);
+          } else if (state === 'rtt-wait-other-b') {
+            syncTimes.push(sample + 10 * chirpLatency);
+            chirp(sample + 20 * chirpLatency);
+            state = 'rtt-wait-own-b';
+          } else if (state === 'rtt-wait-own-b') {
+            $scope.initiateB();
+          } else if (state === 'dead-b') {
+            var last = (syncTime % 44100) + Math.floor((sample) / 44100) * 44100 + 11025;
+            $scope.main_text = String(Math.round((sample - last) / 44100 * 340.29 * 100) / 100) + 'm';
+            $scope.$digest();
+          }
+        }
+
+        // initialize audio
+        function initAudio() {
+          if (navigator.mediaDevices) {
+            navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(function(stream) {
+              context = new AudioContext();
+
+              var inChirp = false;
+              lastChirpTime = null;
+
+              processor = context.createScriptProcessor(bufferSize, 1, 1);
+              prevInputBuffer = context.createBuffer(1, bufferSize, 44100);
+              sample = 0;
+              processor.onaudioprocess = function(e) {
+                var inputData = e.inputBuffer.getChannelData(0);
+                var outputData = e.outputBuffer.getChannelData(0);
+                var prevData = prevInputBuffer.getChannelData(0);
+                var sampleToRadians = chirpFrequency * 2 * Math.PI / 44100;
+                for (var i = 0; i < bufferSize; i++) {
+                  var sinComponent = 0;
+                  var cosComponent = 0;
+                  var rmsSquared = 0;
+                  for (var j = 0; j < convolutionWindow; j++) {
+                    var arg = (sample - j) * sampleToRadians;
+                    var s;
+                    if (i < j) {
+                      s = prevData[bufferSize + i - j];
+                    } else {
+                      s = inputData[i - j];
+                    }
+                    sinComponent += s * Math.sin(arg);
+                    cosComponent += s * Math.cos(arg);
+                    rmsSquared += s * s;
+                  }
+                  rmsSquared /= convolutionWindow;
+                  var result = ((sinComponent * sinComponent / rmsSquared) + (cosComponent * cosComponent / rmsSquared)) / (convolutionWindow * convolutionWindow);
+                  if (result > 0.3025) {
+                    if (!inChirp && (lastChirpTime === null || sample - lastChirpTime > chirpLength * 50)) {
+                      onChirp();
+                      lastChirpTime = sample;
+                      inChirp = true;
+                    }
+                  } else if (result < 0.09 && inChirp) {
+                    inChirp = false;
+                  }
+
+                  if (nextChirpTime && sample > nextChirpTime && sample < nextChirpTime + chirpLength) {
+                    outputData[i] = Math.sin(sample * sampleToRadians);
+                  } else {
+                    outputData[i] = 0;
+                  }
+
+                  sample++;
+                }
+                for (var i = bufferSize + 1 - convolutionWindow; i < bufferSize; i++) {
+                  prevData[i] = inputData[i];
+                }
+              }
+              processor.connect(context.destination);
+
+              microphone = context.createMediaStreamSource(stream);
+              microphone.connect(processor);
+
+      			  console.log("finished audio init");
+
+              selfChirp();
+            }, function(e) {
+              $scope.main_text = 'Error calling getUserMedia: ' + String(e);
+              $scope.$digest();
+              state = 'super-dead';
+            });
+          } else {
+            $scope.main_text = 'Unsupported browser.';
+            $scope.$digest();
+            state = 'super-dead';
+          }
+        }
+
+        setInterval(function() {
+          if (state === 'dead-a') {
+            if (sample > nextChirpTime + chirpLength) {
+              chirp((syncTime % 44100) + Math.ceil((sample) / 44100) * 44100 + 11025);
+            }
+          }
+        }, 1);
+
+        $(initAudio);
+
+        $scope.canChooseTeam = function() {
+          return (state === 'rtt-init');
+        }
+      }]);
+    </script>
+  </head>
+  <body data-ng-cloak class="ng-cloak" data-ng-controller="AudioCircle">
+    <div style="text-align: center; font-size: 10em; margin-top: 50px;">
+      {{ main_text }}
+    </div>
+    <div data-ng-show="canChooseTeam()" style="text-align: center; margin-top: 50px;">
+      <button type="button" data-ng-click="initiateA()">Node A</button>
+      <button type="button" data-ng-click="initiateB()">Node B</button>
+    </div>
+  </body>
+</html>
