@@ -1,17 +1,24 @@
 const synth = new Tone.Synth().toMaster(); // Load Tone.js
 
 const emitFrequency = 1250; // What frequency we're playing sounds at
-const plusMinusFrequency = 50; // How far above and below this frequency is an acceptable reading
-const drawWaveform = false;
+const plusMinusFrequency = 25; // How far above and below this frequency is an acceptable reading
+const drawWaveform = false; // Draw the wareform or not
+const soundPlayTime = 300; // milliseconds
 
 const fps = 30;
 let counter = 0;
-const maxCounter = fps * 5; // Emit every N seconds
+const maxCounter = fps * 3; // Emit every N seconds
 const counterAdd = 3; // How much to add to the counter when you hear a tone
 
+let listening = true;
+
 function playTone () {
+    listening = false;
     // First argument is frequency, second argument is duration (in seconds)
     synth.triggerAttackRelease(emitFrequency, 0.5);
+    setTimeout (() => {
+        listening = true;
+    }, soundPlayTime * 4);
 }
 
 
@@ -55,31 +62,33 @@ function draw() {
         endShape();
     }
 
-    // Store the highest amplitude bin that we care about
-    let highestAmplitudeBin = -1; // Highest-amplitude bin
-    for (i = 0; i < spectrum.length; i++) {
-        //console.log(i, minBin, maxBin);
-        //console.log(maxBin, spectrum[i], minAmplitudeDetected, spectrum[maxBin]);
-        //if (i >= minBin && i <= maxBin && spectrum[i] > minAmplitudeDetected && (maxBin === -1 || spectrum[i] > spectrum[maxBin])) {
+    if (listening) {
+        // Store the highest amplitude bin that we care about
+        let highestAmplitudeBin = -1; // Highest-amplitude bin
+        for (i = 0; i < spectrum.length; i++) {
+            //console.log(i, minBin, maxBin);
+            //console.log(maxBin, spectrum[i], minAmplitudeDetected, spectrum[maxBin]);
+            //if (i >= minBin && i <= maxBin && spectrum[i] > minAmplitudeDetected && (maxBin === -1 || spectrum[i] > spectrum[maxBin])) {
 
-        if (i >= minBin && i <= maxBin && spectrum[i] > minAmplitudeDetected && (highestAmplitudeBin === -1 || spectrum[i] > spectrum[highestAmplitudeBin])) {
-            highestAmplitudeBin = i;
+            if (i >= minBin && i <= maxBin && spectrum[i] > minAmplitudeDetected && (highestAmplitudeBin === -1 || spectrum[i] > spectrum[highestAmplitudeBin])) {
+                highestAmplitudeBin = i;
+            }
         }
-    }
 
-    // Display which frequency was the strongest
-    if (highestAmplitudeBin === -1) {
-        document.getElementById("maxFrequency").innerHTML = "No Sound Detected";
-    } else {
-        let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
-        document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
-        counter += counterAdd;
-    }
+        // Display which frequency was the strongest
+        if (highestAmplitudeBin === -1) {
+            document.getElementById("maxFrequency").innerHTML = "No Sound Detected";
+        } else {
+            let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
+            document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
+            counter += counterAdd;
+        }
 
-    // Update the counter
-    counter += 1;
-    if (counter >= maxCounter) {
-        playTone();
-        counter = 0;
+        // Update the counter
+        counter += 1;
+        if (counter >= maxCounter) {
+            playTone();
+            counter = 0;
+        }
     }
 }
