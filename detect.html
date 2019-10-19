@@ -3,14 +3,21 @@
   <head>
     <meta charset="utf-8">
     <script>
+      // Constants you can change:
+      let hz = 5000;
+      let bucket = 213;
+      let numStd = 3.5;
+      let ticksRequiredForDetection = 15;
+      let toneIncrement = 10;
+      let fireflyPeriod = 100;
+
+      // Other state
       let audioCtx = null;
       let analyser = null;
       let source = null;
-      let hz = 5000;
-      let bucket = 213;
       let state = null;
-      let threshold = 256;
-      let ticksRequiredForDetection = 10;
+      let threshold = 0;
+      let fireflyTime = 0;
 
       function setState(newState) {
         state = newState;
@@ -45,7 +52,7 @@
         }
       }
 
-      function emit() {
+      function emit(callback) {
         const oscillator = audioCtx.createOscillator();
         oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(hz, audioCtx.currentTime); // value in hertz
@@ -53,6 +60,7 @@
         oscillator.start();
         setTimeout(function() {
           oscillator.stop();
+          if (callback) callback();
         }, 1000);
       }
 
@@ -87,7 +95,6 @@
           var x = 0;
 
           for (var i = 0; i < bufferLength; i++) {
-
             var v = dataArray[i] / 128.0;
             var y = v * canvas.height / 2;
 
@@ -112,30 +119,43 @@
           //   console.log([max, argmax]);
           // }
 
+          var power = document.getElementById("power");
+          power.innerText = JSON.stringify(dataArray[bucket].toString());
+
+          canvasCtx.lineTo(canvas.width, canvas.height / 2);
+          canvasCtx.stroke();
+
           if (state === "calibrating") {
             count++;
             sum = sum + dataArray[bucket];
             varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
-            threshold = (sum / count) + 3 * Math.sqrt(varSum / count);
+            threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
             console.log("Threshold: ", threshold);
-          } else {
+          } else if (state === "listening" || state === "tone"){
+            // Check for tones
             if (dataArray[bucket] > threshold) {
               ticksAboveThreshold++;
               if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
                 setState("tone");
+                fireflyTime = fireflyTime + toneIncrement;
                 console.log("Tone!");
               }
             } else {
               setState("listening");
               ticksAboveThreshold = 0;
             }
+
+            // Possibly flash
+            if (fireflyTime > fireflyPeriod) {
+              fireflyTime = 0;
+              setState("flashing");
+              emit(function () {
+                setTimeout(function () { setState("listening") }, 500);
+              });
+            } else {
+              fireflyTime++;
+            }
           }
-
-          var power = document.getElementById("power");
-          power.innerText = JSON.stringify(dataArray[bucket].toString());
-
-          canvasCtx.lineTo(canvas.width, canvas.height / 2);
-          canvasCtx.stroke();
         }
 
         draw();
