@@ -7,7 +7,15 @@
       let analyser = null;
       let source = null;
       let hz = 5000;
-      let stop = false;
+      let bucket = 213;
+      let state = null;
+      let threshold = 256;
+      let ticksRequiredForDetection = 10;
+
+      function setState(newState) {
+        state = newState;
+        document.getElementById("state").innerText = state;
+      }
 
       function setup() {
         // create web audio api context
@@ -21,6 +29,14 @@
             .then(function(stream) {
               source = audioCtx.createMediaStreamSource(stream);
               source.connect(analyser);
+
+              document.getElementById("setup").setAttribute('disabled', 'disabled');
+
+              setState("calibrating");
+              setTimeout(function() {
+                setState("listening");
+              }, 5000);
+              listen();
             }).catch(function(err) {
               console.log('The following error occurred: ' + err);
             })
@@ -37,7 +53,6 @@
         oscillator.start();
         setTimeout(function() {
           oscillator.stop();
-          stop = true;
         }, 1000);
       }
 
@@ -49,6 +64,11 @@
         // Get a canvas defined with ID "oscilloscope"
         var canvas = document.getElementById("oscilloscope");
         var canvasCtx = canvas.getContext("2d");
+
+        let count = 0;
+        let sum = 0;
+        let varSum = 0;
+        let ticksAboveThreshold = 0;
 
         function draw() {
           requestAnimationFrame(draw);
@@ -80,20 +100,39 @@
             x += sliceWidth;
           }
 
-          var power = document.getElementById("power");
-          let bucket = Math.floor((hz / 22050.0) * bufferLength);
-          power.innerText = JSON.stringify([(dataArray[bucket - 1]).toString(), (dataArray[bucket]).toString(), (dataArray[bucket + 1]).toString()]);
-          if (!stop) {
-            let max = 0;
-            let argmax = -1;
-            for (var i = 0; i < bufferLength; i++) {
-              if (dataArray[i] > max) {
-                max = dataArray[i];
-                argmax = i;
+          // if (!stop) {
+          //   let max = 0;
+          //   let argmax = -1;
+          //   for (var i = 0; i < bufferLength; i++) {
+          //     if (dataArray[i] > max) {
+          //       max = dataArray[i];
+          //       argmax = i;
+          //     }
+          //   }
+          //   console.log([max, argmax]);
+          // }
+
+          if (state === "calibrating") {
+            count++;
+            sum = sum + dataArray[bucket];
+            varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
+            threshold = (sum / count) + 3 * Math.sqrt(varSum / count);
+            console.log("Threshold: ", threshold);
+          } else {
+            if (dataArray[bucket] > threshold) {
+              ticksAboveThreshold++;
+              if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
+                setState("tone");
+                console.log("Tone!");
               }
+            } else {
+              setState("listening");
+              ticksAboveThreshold = 0;
             }
-            console.log([max, argmax]);
           }
+
+          var power = document.getElementById("power");
+          power.innerText = JSON.stringify(dataArray[bucket].toString());
 
           canvasCtx.lineTo(canvas.width, canvas.height / 2);
           canvasCtx.stroke();
@@ -104,10 +143,10 @@
     </script>
   </head>
   <body>
-    <div><button onclick="setup()">setup!</button></div>
+    <div><button id="setup" onclick="setup()">setup!</button></div>
     <div><button onclick="emit()">emit!</button></div>
-    <div><button onclick="listen()">listen!</button></div>
 
+    <h2 id="state"></h2>
     <canvas id="oscilloscope"></canvas>
     <div id="power"></div>
   </body>
