@@ -6,8 +6,6 @@
       let audioCtx = null;
       let analyser = null;
       let source = null;
-      let hz = 5000;
-      let bucket = 213;
       let state = null;
       let threshold = 256;
       let ticksRequiredForDetection = 10;
@@ -15,6 +13,12 @@
       function setState(newState) {
         state = newState;
         document.getElementById("state").innerText = state;
+      }
+
+      function sliderChanged () {
+	  let span = document.getElementById("frequencyDisplay");
+	  let slider = document.getElementById("frequencySlider");
+	  span.innerHTML = slider.value;
       }
 
       function setup() {
@@ -46,9 +50,10 @@
       }
 
       function emit() {
+	let slider = document.getElementById("frequencySlider");
         const oscillator = audioCtx.createOscillator();
         oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(hz, audioCtx.currentTime); // value in hertz
+        oscillator.frequency.setValueAtTime(slider.value, audioCtx.currentTime); // value in hertz
         oscillator.connect(audioCtx.destination);
         oscillator.start();
         setTimeout(function() {
@@ -86,9 +91,19 @@
           var sliceWidth = canvas.width * 1.0 / bufferLength;
           var x = 0;
 
-          for (var i = 0; i < bufferLength; i++) {
+            var power = document.getElementById("power");
+	    let slider = document.getElementById("frequencySlider");
 
+          let bucket = Math.floor((slider.value / 22050.0) * bufferLength);
+	    console.log(bufferLength);
+	    console.log(bucket);
+          power.innerText = JSON.stringify([(dataArray[bucket - 1]).toString(), (dataArray[bucket]).toString(), (dataArray[bucket + 1]).toString()]);
+
+            for (var i = 0; i < bufferLength; i++) {
             var v = dataArray[i] / 128.0;
+	      if (Math.abs(bucket - i) > 20) {
+		  var v = 0
+	      }
             var y = v * canvas.height / 2;
 
             if (i === 0) {
@@ -99,18 +114,6 @@
 
             x += sliceWidth;
           }
-
-          // if (!stop) {
-          //   let max = 0;
-          //   let argmax = -1;
-          //   for (var i = 0; i < bufferLength; i++) {
-          //     if (dataArray[i] > max) {
-          //       max = dataArray[i];
-          //       argmax = i;
-          //     }
-          //   }
-          //   console.log([max, argmax]);
-          // }
 
           if (state === "calibrating") {
             count++;
@@ -144,6 +147,8 @@
   </head>
   <body>
     <div><button id="setup" onclick="setup()">setup!</button></div>
+    <div><input id="frequencySlider" type="range" min="20" max="20000" value="44" style="width: 80%" oninput="sliderChanged()" onchange="sliderChanged()"></div>
+    <div><button onclick="setup()">setup!</button></div>
     <div><button onclick="emit()">emit!</button></div>
 
     <h2 id="state"></h2>
