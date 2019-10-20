@@ -94,6 +94,11 @@ function draw() {
             let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
             //document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
             if (!heardTone && counter < maxCounter / 2) {
+                if (counter > maxCounter / 2) {
+                    counter += (maxCounter - counter) / 2;
+                } else {
+                    counter -= ((maxCounter / 2) - counter) / 2;
+                }
                 counter += (maxCounter - counter) / 2;
                 counterAdded = true;
                 heardTone = true;
