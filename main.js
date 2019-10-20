@@ -8,7 +8,9 @@ const soundPlayTime = 300; // milliseconds
 const fps = 30;
 let counter = 0;
 const maxCounter = fps * 3; // Emit every N seconds
-const counterAdd = 3; // How much to add to the counter when you hear a tone
+const counterAdd = 2; // How much to add to the counter when you hear a tone
+let counterAdded = false;
+const proportionalCounterAdd = 0.1;
 
 let listening = true;
 
@@ -27,7 +29,7 @@ const minFrequencyDetected = emitFrequency - plusMinusFrequency; // Don't check 
 const minBin = Math.floor(minFrequencyDetected / frequencyPerBin); // Don't check bins below this
 const maxFrequencyDetected = emitFrequency + plusMinusFrequency; // Don't check frequencies above this
 const maxBin = Math.ceil(maxFrequencyDetected / frequencyPerBin); // Don't check bins above this
-const minAmplitudeDetected = 256 * 0.5; // Minimum amplitude to consider
+const minAmplitudeDetected = 256 * 0.6; // Minimum amplitude to consider
 
 console.log(minBin, maxBin);
 
@@ -81,7 +83,12 @@ function draw() {
         } else {
             let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
             document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
-            counter += counterAdd;
+            //let distance = counter > maxCounter / 2 ? Math.abs(maxCounter - counter) : counter;
+            if (!counterAdded && counter < maxCounter / 2) {
+                counter -= counterAdd;
+                counterAdded = true;
+            }
+            //counter += counterAdd;
         }
 
         // Update the counter
@@ -89,6 +96,11 @@ function draw() {
         if (counter >= maxCounter) {
             playTone();
             counter = 0;
+            counterAdded = false;
         }
     }
+}
+
+function fakeSound () {
+
 }
