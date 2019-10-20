@@ -92,11 +92,15 @@
         musicBufferSource.buffer = musicBuffer;
         musicBufferSource.connect(audioCtx.destination);
         musicBufferSource.start();
+        musicBufferSource.onended = function() {
+          musicBufferSource = null;
+        };
       }
 
       function stopMusic() {
         if (musicBufferSource) {
           musicBufferSource.stop();
+          musicBufferSource = null;
         }
       }
 
