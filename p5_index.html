@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <!--
+        https://github.com/cantino/ultrastound
+        https://cantino.github.io/ultrastound/index.html
+        -->
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -26,11 +30,21 @@
         <div>Frequency <span id="frequencyDisplay">17500</span></div>
         <div><input id="frequencySlider" type="range" min="20" max="20000" value="44" style="width: 80%" oninput="sliderChanged()" onchange="sliderChanged()"></div>
         -->
+        <!--
         <div><button onclick="playTone()">Play Tone</button></div>
         <hr/>
+        -->
         <!-- <div><button onclick="recordAudio()">Record From Microphone</button></div> -->
-        <div id="playing" style="color: green;">-</div>
-        <div id="hearing" style="color: red;">-</div>
-        <div id="maxFrequency"></div>
+        <div>
+            <span id="playing" style="color: green;">-</span>
+            <span id="hearing" style="color: red;">-</span>
+            <button id="delayedStart" onclick="delayedStart()" style="float: right;">Delayed Start</button>
+            <!-- <span id="listening" style="float: right; color: white; background-color: black;">listening</span> -->
+        </div>
+        <div>
+            <span id="counter" style="color: white; background-color: black;">0</span>
+            <span id="sync" style="float: right; color: white; background-color: red;">No Sync</span>
+        </div>
+        <!-- <div id="maxFrequency"></div> -->
     </body>
 </html>
