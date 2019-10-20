@@ -9,10 +9,10 @@ const fps = 30;
 let counter = 0;
 const maxCounter = fps * 3; // Emit every N seconds
 const counterAdd = 2; // How much to add to the counter when you hear a tone
-let counterAdded = false;
 const proportionalCounterAdd = 0.1;
 
-let listening = true;
+let listening = true; // If true, pay attention to tones you hear
+let heardTone = false; // If true, a tone was recently heard. Wait until it's over to listen again
 
 function playTone () {
     listening = false;
@@ -20,6 +20,7 @@ function playTone () {
     synth.triggerAttackRelease(emitFrequency, 0.5);
     setTimeout (() => {
         listening = true;
+        playingIndicator.innerHTML = "-";
     }, soundPlayTime * 4);
 }
 
@@ -31,7 +32,8 @@ const maxFrequencyDetected = emitFrequency + plusMinusFrequency; // Don't check 
 const maxBin = Math.ceil(maxFrequencyDetected / frequencyPerBin); // Don't check bins above this
 const minAmplitudeDetected = 256 * 0.6; // Minimum amplitude to consider
 
-console.log(minBin, maxBin);
+let playingIndicator;
+let hearingIndicator;
 
 let mic;
 let fft;
@@ -44,6 +46,9 @@ function setup(){
     fft.setInput(mic);
     if (drawWaveform) { createCanvas(1024, 512); }
     frameRate(30);
+
+    playingIndicator = document.getElementById("playing");
+    hearingIndicator = document.getElementById("hearing");
 }
 
 // Automatically called by p5.js on each frame render
@@ -79,16 +84,20 @@ function draw() {
 
         // Display which frequency was the strongest
         if (highestAmplitudeBin === -1) {
-            document.getElementById("maxFrequency").innerHTML = "No Sound Detected";
+            //document.getElementById("maxFrequency").innerHTML = "No Sound Detected";
+            heardTone = false;
+            hearingIndicator.innerHTML = "-";
         } else {
             let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
-            document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
+            //document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
             //let distance = counter > maxCounter / 2 ? Math.abs(maxCounter - counter) : counter;
-            if (!counterAdded && counter < maxCounter / 2) {
+            if (!heardTone && counter < maxCounter / 2) {
                 counter -= counterAdd;
                 counterAdded = true;
+                heardTone = true;
+                hearingIndicator.innerHTML = "Heard Tone";
             }
-            //counter += counterAdd;
+            counter += counterAdd;
         }
 
         // Update the counter
@@ -97,6 +106,7 @@ function draw() {
             playTone();
             counter = 0;
             counterAdded = false;
+            playingIndicator.innerHTML = "Playing";
         }
     }
 }
