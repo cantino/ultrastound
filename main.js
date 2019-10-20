@@ -1,6 +1,6 @@
 const synth = new Tone.Synth().toMaster(); // Load Tone.js
 
-const emitFrequency = 17500; // What frequency we're playing sounds at
+const emitFrequency = 1250; // What frequency we're playing sounds at
 const plusMinusFrequency = 25; // How far above and below this frequency is an acceptable reading
 const drawWaveform = false; // Draw the wareform or not
 const soundPlayTime = 0.2; // seconds
@@ -26,7 +26,7 @@ const syncCounterRange = Math.round(maxCounter * 0.15); // How far off the count
 let syncCycles = 0; // How mny cycles this node thinks its been in sync for
 
 const audioToPlay = new Audio("./sounds/boondock_saints_theme.mp3"); // The audio clip to play when in sync
-const syncCyclesToPlayAudio = 3; // How many synchronized cycles there should be before playing the audio clip
+const syncCyclesToPlayAudio = 5; // How many synchronized cycles there should be before playing the audio clip
 let audioIsPlaying = false; // True if the audio is playing
 
 function playTone () {
@@ -166,10 +166,12 @@ function draw() {
                 syncCycles += 1;
 
                 // If the number of cycles in sync is sufficient, and the audio is not already being played, play the audio
+                /* Temporarily disabled because it doesn't work very well because things don't always sync at the same time
                 if (syncCycles == syncCyclesToPlayAudio && !audioIsPlaying) {
                     audioToPlay.play();
                     audioIsPlaying = true;
                 }
+                */
             } else {
                 // Assume we're back in sync whenever we play a sound
                 inSync = true;
