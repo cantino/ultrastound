@@ -8,16 +8,26 @@
       let hz = 18000;
       let numStd = 4;
       let ticksRequiredForDetection = 25;
-      let fireflyPeriod = 300;
+      let regularPeriod = 4200;
 
       // Other state
+      let t0 = -1;
       let bucket = -1;
       let audioCtx = null;
       let analyser = null;
       let source = null;
       let state = null;
       let threshold = 256 * 0.6;
-      let fireflyTime = Math.random() * fireflyPeriod;
+      let currentAdjustedPeriod = Math.random() * regularPeriod;
+
+      function getTimeFlown() {
+	return performance.now() - t0
+      }
+
+      function frequencySliderChanged () {
+	let slider = document.getElementById("frequencySlider");
+	hz = slider.value;
+      }
 
       function setState(newState) {
         state = newState;
@@ -31,9 +41,12 @@
 
       function go() {
         setState("Listening");
+        let t0 = performance.now()
       }
 
       function setup() {
+        let slider = document.getElementById("frequencySlider");
+        slider.value = hz;
         // create web audio api context
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -107,7 +120,7 @@
 
           for (let i = 0; i < bufferLength; i++) {
             let v = dataArray[i] / 128.0;
-            let y = v * canvas.height / 2;
+            let y = canvas.height - v * canvas.height / 2;
 
             if (i === 0) {
               canvasCtx.moveTo(x, y);
@@ -162,21 +175,21 @@
               if (dataArray[bucket] > threshold) {
                 ticksAboveThreshold++;
                 if (state !== "Heard a tone" && ticksAboveThreshold > ticksRequiredForDetection) {
-                  setState("Heard a tone");
-                  fireflyTime = (fireflyPeriod - fireflyTime) / 2.0;
-                  console.log("Tone!");
+                    setState("Heard a tone");
+		  // weird convergence
+                  // fireflyTime = (fireflyPeriod - fireflyTime) / 2.0;
+                    currentAdjustedPeriod = (regularPeriod - getTimeFlown()) / 2.0;
+		  console.log("Tone!");
                 }
               } else {
                 setState("Listening");
                 ticksAboveThreshold = 0;
               }
             }
-
             // Possibly flash
-            fireflyTime++;
-            if (fireflyTime > fireflyPeriod) {
-              fireflyTime = 0;
-
+            if (getTimeFlown() > currentAdjustedPeriod) {
+	      t0 = performance.now();
+              currentAdjustedPeriod = regularPeriod;
               if (state === "Listening" || state === "Heard a tone") {
                 setState("Flashing");
                 emit(function () {
@@ -196,8 +209,8 @@
   <body id="body">
     <div><button id="setup" onclick="setup()">setup!</button></div>
     <div><button id="go" disabled="disabled" onclick="go()">go!</button></div>
-
     <h2 id="state" style="color: #888"></h2>
+    <div><input id="frequencySlider" type="range" min="20" max="20000" value="" style="width: 80%" oninput="frequencySliderChanged()" onchange="frequencySliderChanged()"></div>
     <canvas id="oscilloscope"></canvas>
   </body>
 </html>
