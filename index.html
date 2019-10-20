@@ -88,7 +88,6 @@
       }
 
       function startMusic() {
-        stopMusic();
         musicBufferSource = audioCtx.createBufferSource();
         musicBufferSource.buffer = musicBuffer;
         musicBufferSource.connect(audioCtx.destination);
@@ -161,7 +160,7 @@
           // Listen for tones.
           if (state === "Listening" || state === "Heard a tone") {
             // Check for tones
-            let argmax = findArgmax(dataArray, Math.floor(bufferLength * 0.3), 256 * 0.1);
+            let argmax = findArgmax(dataArray, Math.floor(bufferLength * 0.4), 256 * 0.1);
             if (argmax !== -1) {
               // console.log(argmax);
               if (peakStart && previousArgMax === argmax) {
@@ -191,7 +190,7 @@
 
             if (state === "Listening" || state === "Heard a tone") {
               setState("Flashing");
-              stopMusic()
+              stopMusic();
               emit(function () {
                 startMusic();
                 setState("Listening");
