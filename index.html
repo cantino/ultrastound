@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script>
       // Constants you can change:
-      let hz = 20000;
-      let timeRequiredForDetection = 100;
+      let hz = 19000;
+      let timeRequiredForDetection = 200;
 
       // Other state
       let bucket = -1;
@@ -161,7 +161,7 @@
           // Listen for tones.
           if (state === "Listening" || state === "Heard a tone") {
             // Check for tones
-            let argmax = findArgmax(dataArray, Math.floor(bufferLength * 0.3), 256 * 0.4);
+            let argmax = findArgmax(dataArray, Math.floor(bufferLength * 0.3), 256 * 0.1);
             if (argmax !== -1) {
               // console.log(argmax);
               if (peakStart && previousArgMax === argmax) {
