@@ -5,22 +5,22 @@
     <script>
       // Constants you can change:
       let hz = 18000;
-      let buckets = [767, 768];
       let numStd = 4;
       let ticksRequiredForDetection = 25;
       let fireflyPeriod = 300;
 
       // Other state
+      let bucket = -1;
       let audioCtx = null;
       let analyser = null;
       let source = null;
       let state = null;
-      let threshold = 0;
+      let threshold = 256 * 0.6;
       let fireflyTime = Math.random() * fireflyPeriod;
 
       function setState(newState) {
         state = newState;
-        if (state === "flashing") {
+        if (state === "Flashing") {
           document.getElementById("body").setAttribute("style", "background-color: #fff");
         } else {
           document.getElementById("body").setAttribute("style", "background-color: #333");
@@ -29,7 +29,7 @@
       }
 
       function go() {
-        setState("listening");
+        setState("Listening");
       }
 
       function setup() {
@@ -46,12 +46,13 @@
               source.connect(analyser);
 
               document.getElementById("setup").setAttribute('disabled', 'disabled');
+              document.getElementById("go").removeAttribute('disabled');
 
-              setState("calibrating");
-              setTimeout(function() {
-                setState("ready");
-              }, 5000);
+              setState("Talking to myself");
               listen();
+              emit(function() {
+                setState("Calculating threshold");
+              });
             }).catch(function(err) {
               console.log('The following error occurred: ' + err);
             })
@@ -85,6 +86,7 @@
         let sum = 0;
         let varSum = 0;
         let ticksAboveThreshold = 0;
+        let argmaxes = {};
 
         function draw() {
           requestAnimationFrame(draw);
@@ -115,46 +117,56 @@
             x += sliceWidth;
           }
 
-          let max = 0;
-          let argmax = -1;
-          for (let i = 0; i < bufferLength; i++) {
-            if (dataArray[i] > max) {
-              max = dataArray[i];
-              argmax = i;
-            }
-          }
-          console.log("argmax: ", argmax);
-
           canvasCtx.lineTo(canvas.width, canvas.height / 2);
           canvasCtx.stroke();
 
-          if (state === "calibrating") {
-            count++;
-            buckets.forEach((bucket) => {
-              sum = sum + dataArray[bucket];
+          if (state === "Talking to myself") {
+            let max = 0;
+            let argmax = -1;
+            for (let i = Math.floor(bufferLength / 4); i < bufferLength; i++) {
+              if (dataArray[i] > max) {
+                max = dataArray[i];
+                argmax = i;
+              }
+            }
+            argmaxes[argmax] = argmaxes[argmax] || 0;
+            argmaxes[argmax]++;
+          } else if (state === "Calculating threshold") {
+            console.log("Popular buckets: ", argmaxes);
+            let max = -1;
+            Object.keys(argmaxes).forEach(function (argmax) {
+              if (argmaxes[argmax] > max) {
+                max = argmaxes[argmax];
+                bucket = argmax;
+              }
             });
-            buckets.forEach((bucket) => {
-              varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
-            });
-            threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
-            console.log("Threshold: ", threshold);
+            console.log("Detected bucket: ", bucket);
+            setState("ready");
+            //
+            // count++;
+            // buckets.forEach((bucket) => {
+            //   sum = sum + dataArray[bucket];
+            // });
+            // buckets.forEach((bucket) => {
+            //   varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
+            // });
+            // // threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
+            // threshold = buckets.length * 256 * 0.6;
+            // console.log("Threshold: ", threshold);
+            //
+            //
           } else {
-            if (state === "listening" || state === "tone") {
+            if (state === "Listening" || state === "Heard a tone") {
               // Check for tones
-              sum = 0;
-              buckets.forEach((bucket) => {
-                sum = sum + dataArray[bucket];
-              });
-              if (sum > threshold) {
+              if (dataArray[bucket] > threshold) {
                 ticksAboveThreshold++;
-                if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
-                  setState("tone");
-                  // fireflyTime = fireflyTime + toneIncrement;
+                if (state !== "Heard a tone" && ticksAboveThreshold > ticksRequiredForDetection) {
+                  setState("Heard a tone");
                   fireflyTime = (fireflyPeriod - fireflyTime) / 2.0;
                   console.log("Tone!");
                 }
               } else {
-                setState("listening");
+                setState("Listening");
                 ticksAboveThreshold = 0;
               }
             }
@@ -163,13 +175,12 @@
             fireflyTime++;
             if (fireflyTime > fireflyPeriod) {
               fireflyTime = 0;
-              console.log("Flashing");
 
-              if (state === "listening" || state === "tone") {
-                setState("flashing");
+              if (state === "Listening" || state === "Heard a tone") {
+                setState("Flashing");
                 emit(function () {
                   setTimeout(function () {
-                    setState("listening")
+                    setState("Listening")
                   }, 500);
                 });
               }
@@ -183,9 +194,9 @@
   </head>
   <body id="body">
     <div><button id="setup" onclick="setup()">setup!</button></div>
-    <div><button onclick="go()">go!</button></div>
+    <div><button id="go" disabled="disabled" onclick="go()">go!</button></div>
 
-    <h2 id="state"></h2>
+    <h2 id="state" style="color: #888"></h2>
     <canvas id="oscilloscope"></canvas>
   </body>
 </html>
