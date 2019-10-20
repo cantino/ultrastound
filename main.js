@@ -1,10 +1,17 @@
 const synth = new Tone.Synth().toMaster(); // Load Tone.js
 
-const emitFrequency = 1250; // What frequency we're playing sounds at
+const emitFrequency = 17500; // What frequency we're playing sounds at
 const plusMinusFrequency = 25; // How far above and below this frequency is an acceptable reading
 const drawWaveform = false; // Draw the wareform or not
 const soundPlayTime = 0.2; // seconds
 const songIgnoreTime = 4.5 // Multiplier of soundPlayTime for how long to ignore incoming sounds
+
+const frequencyPerBin = 22050 / 1024; // Total frequency capture divided by number of bins
+const minFrequencyDetected = emitFrequency - plusMinusFrequency; // Don't check frequencies below this
+const minBin = Math.floor(minFrequencyDetected / frequencyPerBin); // Don't check bins below this
+const maxFrequencyDetected = emitFrequency + plusMinusFrequency; // Don't check frequencies above this
+const maxBin = Math.ceil(maxFrequencyDetected / frequencyPerBin); // Don't check bins above this
+const minAmplitudeDetected = 256 * 0.2; // Minimum amplitude to consider
 
 const fps = 30; // Frames per second
 let counter = 0; // Keep track of when we need to emit a sound
@@ -45,14 +52,6 @@ function delayedStart () {
         active = true;
     }, Math.random() * secondsBetweenEmit * 1000);
 }
-
-
-const frequencyPerBin = 22050 / 1024; // Total frequency capture divided by number of bins
-const minFrequencyDetected = emitFrequency - plusMinusFrequency; // Don't check frequencies below this
-const minBin = Math.floor(minFrequencyDetected / frequencyPerBin); // Don't check bins below this
-const maxFrequencyDetected = emitFrequency + plusMinusFrequency; // Don't check frequencies above this
-const maxBin = Math.ceil(maxFrequencyDetected / frequencyPerBin); // Don't check bins above this
-const minAmplitudeDetected = 256 * 0.6; // Minimum amplitude to consider
 
 // DOM elements for visualizing the process
 let body;
