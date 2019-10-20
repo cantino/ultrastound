@@ -142,7 +142,7 @@
               }
             });
             console.log("Detected bucket: ", bucket);
-            setState("ready");
+            setState("Ready");
             //
             // count++;
             // buckets.forEach((bucket) => {
@@ -182,7 +182,7 @@
                 emit(function () {
                   setTimeout(function () {
                     setState("Listening")
-                  }, 500);
+                  }, 250);
                 });
               }
             }
