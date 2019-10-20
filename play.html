@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <script>
+      // Other state
+      let audioCtx = null;
+      let analyser = null;
+      let source = null;
+      let state = null;
+      let threshold = 0;
+
+      function setup() {
+        // create web audio api context
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+
+        if (navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({audio: true})
+            .then(function(stream) {
+              source = audioCtx.createMediaStreamSource(stream);
+              source.connect(analyser);
+
+              document.getElementById("setup").setAttribute('disabled', 'disabled');
+
+            }).catch(function(err) {
+              console.log('The following error occurred: ' + err);
+            })
+        } else {
+          console.log('getUserMedia not supported on your browser!');
+        }
+      }
+
+      function emit(freq, duration, callback) {
+        const oscillator = audioCtx.createOscillator();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime); // value in hertz
+        oscillator.connect(audioCtx.destination);
+        oscillator.start();
+        setTimeout(function() {
+          oscillator.stop();
+          if (callback) callback();
+        },duration);
+      }
+
+      
+
+
+  </script>
+  </head>
+  <body>
+    <div><button id="setup" onclick="setup()">setup!</button></div>
+    <div><input type="text" id="frequency" value="5000">Hz</input></div>
+    <div><input type="text" id="duration" value="100">ms</input></div>
+    <div><button onclick="emit(parseInt(document.getElementById('frequency').value), parseInt(document.getElementById('duration').value), null)">emit!</button></div>
+
+  </body>
+</html>
