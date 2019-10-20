@@ -31,10 +31,6 @@
         document.getElementById("state").innerText = state;
       }
 
-      function go() {
-        setState("Listening");
-      }
-
       function setup() {
         // create web audio api context
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -52,7 +48,6 @@
               source.connect(analyser);
 
               document.getElementById("setup").setAttribute('disabled', 'disabled');
-              document.getElementById("go").removeAttribute('disabled');
 
               // Fetch the music
               const URL = 'trimmed.m4a';
@@ -209,7 +204,6 @@
   </head>
   <body id="body">
     <div><button id="setup" onclick="setup()">setup!</button></div>
-    <div><button id="go" disabled="disabled" onclick="go()">go!</button></div>
 
     <h2 id="state" style="color: #888"></h2>
     <canvas id="oscilloscope"></canvas>
