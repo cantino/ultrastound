@@ -21,6 +21,7 @@ function playTone () {
     setTimeout (() => {
         listening = true;
         playingIndicator.innerHTML = "-";
+        body.style.backgroundColor = "black";
     }, soundPlayTime * 4);
 }
 
@@ -32,6 +33,7 @@ const maxFrequencyDetected = emitFrequency + plusMinusFrequency; // Don't check 
 const maxBin = Math.ceil(maxFrequencyDetected / frequencyPerBin); // Don't check bins above this
 const minAmplitudeDetected = 256 * 0.6; // Minimum amplitude to consider
 
+let body;
 let playingIndicator;
 let hearingIndicator;
 
@@ -47,6 +49,7 @@ function setup(){
     if (drawWaveform) { createCanvas(1024, 512); }
     frameRate(30);
 
+    body = document.getElementsByTagName("BODY")[0];
     playingIndicator = document.getElementById("playing");
     hearingIndicator = document.getElementById("hearing");
 }
@@ -90,14 +93,13 @@ function draw() {
         } else {
             let detectedFrequency = Math.round(highestAmplitudeBin * frequencyPerBin);
             //document.getElementById("maxFrequency").innerHTML = detectedFrequency + " Hz (bin " + highestAmplitudeBin + ")";
-            //let distance = counter > maxCounter / 2 ? Math.abs(maxCounter - counter) : counter;
             if (!heardTone && counter < maxCounter / 2) {
-                counter -= counterAdd;
+                counter += (maxCounter - counter) / 2;
                 counterAdded = true;
                 heardTone = true;
                 hearingIndicator.innerHTML = "Heard Tone";
             }
-            counter += counterAdd;
+            //counter += counterAdd;
         }
 
         // Update the counter
@@ -107,6 +109,7 @@ function draw() {
             counter = 0;
             counterAdded = false;
             playingIndicator.innerHTML = "Playing";
+            body.style.backgroundColor = "white";
         }
     }
 }
