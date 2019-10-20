@@ -51,20 +51,48 @@
 	  document.getElementById("freeze").disabled = true;
       }
 
-      function isPointy(dataBuffer, idx, w) {
-	  if (idx > 50 && idx < 80) {
-	    return true;
-	  }  else {return false;}
+      function getAvg(arr) {
+	  let sum = 0;
+	  for (let i = 0; i < arr.length; i++) {
+	      sum += arr[i];
+	  }
+	  return sum / arr.length;
+      }
 
-	  if (idx > dataBuffer.length - w) {
+      function getSumSqDiffAvg(arr) {
+	  let avg = getAvg(arr);
+	  let sumSqDiffAvg = 0;
+	  for (let i = 0; i < arr.length; i++) {
+	      sumSqDiffAvg += (arr[i] - avg) * (arr[i] - avg)
+	  }
+	  return sumSqDiffAvg;
+      }
+
+      function getStd(arr) {
+	  let sumSqDiffAvg = getSumSqDiffAvg(arr);
+	  let std = Math.sqrt(sumSqDiffAvg) / arr.length
+	  return std
+      }
+
+      function getLocalStd(arr, minFrac, maxFrac) {
+	  minBucket = Math.floor(arr.length * minFrac)
+	  maxBucket = Math.floor(arr.length * maxFrac)
+	  return getStd(arr.slice(minBucket, maxBucket))
+      }
+
+      function isPointy(dataArray, idx, w, threshold) {
+	  if (dataArray[idx] < threshold) {
 	      return false;
 	  }
-	  for (let j = idx; j < idx + w; j++) {
-	      if (j == idx) {
+	  if (idx > dataArray.length - w) {
+	      return false;
+	  }
+	  for (let j = -Math.floor(w/2); j < Math.floor(w/2); j++) {
+	      if (Math.abs(j) < 2) {
 		  continue;
 	      }
-	      if (dataBuffer[idx] / dataBuffer[j] > 10 &&
-		  dataBuffer[idx] / dataBuffer[j] > 10) {
+	      if (dataArray[idx] / dataArray[idx + j] < 2 &&
+		  dataArray[idx] / dataArray[idx + j] < 2) {
 		  return false;
 	      }
 	  }
@@ -151,16 +179,34 @@
 	  let yPrev = 0;
 
           let lastSegmentWasPointy = false;
-
+	  let finishPeak = false;
+	  // Only set if you promise never to use a lower frequency signal
+	  // This value is the fraction of the frequency range you'll
+	  // never try
+	  let rangeMin = 0.1;
+          let globalAvg = getAvg(dataArray);
+	  let rangedStd = getLocalStd(dataArray, rangeMin, 1);
           for (let i = 0; i < bufferLength; i++) {
             let v = dataArray[i] / 128.0;
+
             let y = canvas.height - v * canvas.height / 2;
 
             if (i === 0) {
               canvasCtx.moveTo(x, y);
             } else {
-
-		if (lastSegmentWasPointy) {
+		if (i < Math.floor(dataArray.length * rangeMin)) {
+		  canvasCtx.lineTo(x, y);
+		} else if (lastSegmentWasPointy) {
+		    // If still part of peak
+		    if (y > yPrev * 0.9) {
+			canvasCtx.lineTo(x, y);
+		    } else {
+			canvasCtx.lineTo(x, y);
+			finishPeak = true;
+			lastSegmentWasPointy = false;
+		    }
+		} else if (finishPeak) {
+		    finishPeak = false;
 		    // Draw the descending half of the peak
 		    canvasCtx.lineTo(x, y);
 		    canvasCtx.strokeStyle = 'green';
@@ -169,17 +215,16 @@
 		    canvasCtx.beginPath();
 		    canvasCtx.moveTo(xPrev, yPrev);
 		    canvasCtx.strokeStyle = 'black';
-		    lastSegmentWasPointy = false;
-		} else if (isPointy(dataArray, i, 3)) {
-		    // Draw last segment
+		} else if (isPointy(dataArray, i, 5, globalAvg + 5*rangedStd)) {
+		    // Draw last segment as black
 		    canvasCtx.stroke();
 
 		    canvasCtx.beginPath();
 		    canvasCtx.moveTo(xPrev, yPrev);
 		    canvasCtx.lineTo(x, y);
 		    lastSegmentWasPointy = true;
-		}
-		else {
+		    noLongerPointy = false;
+		} else {
 		  canvasCtx.lineTo(x, y);
 		}
             }
