@@ -41,7 +41,34 @@
 
       function go() {
         setState("Listening");
-        let t0 = performance.now()
+	let t0 = performance.now()
+	document.getElementById("freeze").removeAttribute('disabled');
+	listen();
+      }
+
+      function freeze() {
+	  setState("Frozen");
+	  document.getElementById("freeze").disabled = true;
+      }
+
+      function isPointy(dataBuffer, idx, w) {
+	  if (idx > 50 && idx < 80) {
+	    return true;
+	  }  else {return false;}
+
+	  if (idx > dataBuffer.length - w) {
+	      return false;
+	  }
+	  for (let j = idx; j < idx + w; j++) {
+	      if (j == idx) {
+		  continue;
+	      }
+	      if (dataBuffer[idx] / dataBuffer[j] > 10 &&
+		  dataBuffer[idx] / dataBuffer[j] > 10) {
+		  return false;
+	      }
+	  }
+	  return true;
       }
 
       function setup() {
@@ -90,7 +117,7 @@
       function listen() {
         let bufferLength = analyser.frequencyBinCount;
         let dataArray = new Uint8Array(bufferLength);
-        analyser.getByteFrequencyData(dataArray);
+        // analyser.getByteFrequencyData(dataArray);
 
         // Get a canvas defined with ID "oscilloscope"
         let canvas = document.getElementById("oscilloscope");
@@ -103,9 +130,12 @@
         let argmaxes = {};
 
         function draw() {
-          requestAnimationFrame(draw);
+	  if (state === "Frozen") {
+	      return;
+	  }
 
-          analyser.getByteFrequencyData(dataArray);
+	  requestAnimationFrame(draw);
+	  analyser.getByteFrequencyData(dataArray);
 
           canvasCtx.fillStyle = "rgb(200, 200, 200)";
           canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -117,6 +147,10 @@
 
           let sliceWidth = canvas.width * 1.0 / bufferLength;
           let x = 0;
+	  let xPrev = 0;
+	  let yPrev = 0;
+
+          let lastSegmentWasPointy = false;
 
           for (let i = 0; i < bufferLength; i++) {
             let v = dataArray[i] / 128.0;
@@ -125,9 +159,32 @@
             if (i === 0) {
               canvasCtx.moveTo(x, y);
             } else {
-              canvasCtx.lineTo(x, y);
-            }
 
+		if (lastSegmentWasPointy) {
+		    // Draw the descending half of the peak
+		    canvasCtx.lineTo(x, y);
+		    canvasCtx.strokeStyle = 'green';
+		    canvasCtx.stroke()
+
+		    canvasCtx.beginPath();
+		    canvasCtx.moveTo(xPrev, yPrev);
+		    canvasCtx.strokeStyle = 'black';
+		    lastSegmentWasPointy = false;
+		} else if (isPointy(dataArray, i, 3)) {
+		    // Draw last segment
+		    canvasCtx.stroke();
+
+		    canvasCtx.beginPath();
+		    canvasCtx.moveTo(xPrev, yPrev);
+		    canvasCtx.lineTo(x, y);
+		    lastSegmentWasPointy = true;
+		}
+		else {
+		  canvasCtx.lineTo(x, y);
+		}
+            }
+            xPrev = x
+            yPrev = y
             x += sliceWidth;
           }
 
@@ -209,6 +266,7 @@
   <body id="body">
     <div><button id="setup" onclick="setup()">setup!</button></div>
     <div><button id="go" disabled="disabled" onclick="go()">go!</button></div>
+    <div><button id="freeze" disabled="disabled" onclick="freeze()">freeze!</button></div>
     <h2 id="state" style="color: #888"></h2>
     <div><input id="frequencySlider" type="range" min="20" max="20000" value="" style="width: 80%" oninput="frequencySliderChanged()" onchange="frequencySliderChanged()"></div>
     <canvas id="oscilloscope"></canvas>
