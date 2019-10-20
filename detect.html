@@ -9,7 +9,7 @@
       let numStd = 3.5;
       let ticksRequiredForDetection = 15;
       let toneIncrement = 10;
-      let fireflyPeriod = 100;
+      let fireflyPeriod = 300;
 
       // Other state
       let audioCtx = null;
@@ -142,7 +142,8 @@
                 ticksAboveThreshold++;
                 if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
                   setState("tone");
-                  fireflyTime = fireflyTime + toneIncrement;
+                  // fireflyTime = fireflyTime + toneIncrement;
+                  fireflyTime = (fireflyPeriod - fireflyTime) / 2.0;
                   console.log("Tone!");
                 }
               } else {
@@ -152,6 +153,7 @@
             }
 
             // Possibly flash
+            fireflyTime++;
             if (fireflyTime > fireflyPeriod) {
               fireflyTime = 0;
               console.log("Flashing");
@@ -164,8 +166,6 @@
                   }, 500);
                 });
               }
-            } else {
-              fireflyTime++;
             }
           }
         }
