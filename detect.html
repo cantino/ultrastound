@@ -4,11 +4,10 @@
     <meta charset="utf-8">
     <script>
       // Constants you can change:
-      let hz = 5000;
-      let bucket = 213;
-      let numStd = 3.5;
-      let ticksRequiredForDetection = 15;
-      let toneIncrement = 10;
+      let hz = 18000;
+      let buckets = [767, 768];
+      let numStd = 4;
+      let ticksRequiredForDetection = 25;
       let fireflyPeriod = 300;
 
       // Other state
@@ -21,6 +20,11 @@
 
       function setState(newState) {
         state = newState;
+        if (state === "flashing") {
+          document.getElementById("body").setAttribute("style", "background-color: #fff");
+        } else {
+          document.getElementById("body").setAttribute("style", "background-color: #333");
+        }
         document.getElementById("state").innerText = state;
       }
 
@@ -69,13 +73,13 @@
       }
 
       function listen() {
-        var bufferLength = analyser.frequencyBinCount;
-        var dataArray = new Uint8Array(bufferLength);
+        let bufferLength = analyser.frequencyBinCount;
+        let dataArray = new Uint8Array(bufferLength);
         analyser.getByteFrequencyData(dataArray);
 
         // Get a canvas defined with ID "oscilloscope"
-        var canvas = document.getElementById("oscilloscope");
-        var canvasCtx = canvas.getContext("2d");
+        let canvas = document.getElementById("oscilloscope");
+        let canvasCtx = canvas.getContext("2d");
 
         let count = 0;
         let sum = 0;
@@ -95,12 +99,12 @@
 
           canvasCtx.beginPath();
 
-          var sliceWidth = canvas.width * 1.0 / bufferLength;
-          var x = 0;
+          let sliceWidth = canvas.width * 1.0 / bufferLength;
+          let x = 0;
 
-          for (var i = 0; i < bufferLength; i++) {
-            var v = dataArray[i] / 128.0;
-            var y = v * canvas.height / 2;
+          for (let i = 0; i < bufferLength; i++) {
+            let v = dataArray[i] / 128.0;
+            let y = v * canvas.height / 2;
 
             if (i === 0) {
               canvasCtx.moveTo(x, y);
@@ -111,34 +115,37 @@
             x += sliceWidth;
           }
 
-          // if (!stop) {
-          //   let max = 0;
-          //   let argmax = -1;
-          //   for (var i = 0; i < bufferLength; i++) {
-          //     if (dataArray[i] > max) {
-          //       max = dataArray[i];
-          //       argmax = i;
-          //     }
-          //   }
-          //   console.log([max, argmax]);
-          // }
-
-          var power = document.getElementById("power");
-          power.innerText = JSON.stringify(dataArray[bucket].toString());
+          let max = 0;
+          let argmax = -1;
+          for (let i = 0; i < bufferLength; i++) {
+            if (dataArray[i] > max) {
+              max = dataArray[i];
+              argmax = i;
+            }
+          }
+          console.log("argmax: ", argmax);
 
           canvasCtx.lineTo(canvas.width, canvas.height / 2);
           canvasCtx.stroke();
 
           if (state === "calibrating") {
             count++;
-            sum = sum + dataArray[bucket];
-            varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
+            buckets.forEach((bucket) => {
+              sum = sum + dataArray[bucket];
+            });
+            buckets.forEach((bucket) => {
+              varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
+            });
             threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
             console.log("Threshold: ", threshold);
           } else {
             if (state === "listening" || state === "tone") {
               // Check for tones
-              if (dataArray[bucket] > threshold) {
+              sum = 0;
+              buckets.forEach((bucket) => {
+                sum = sum + dataArray[bucket];
+              });
+              if (sum > threshold) {
                 ticksAboveThreshold++;
                 if (state !== "tone" && ticksAboveThreshold > ticksRequiredForDetection) {
                   setState("tone");
@@ -174,12 +181,11 @@
       }
     </script>
   </head>
-  <body>
+  <body id="body">
     <div><button id="setup" onclick="setup()">setup!</button></div>
     <div><button onclick="go()">go!</button></div>
 
     <h2 id="state"></h2>
     <canvas id="oscilloscope"></canvas>
-    <div id="power"></div>
   </body>
 </html>
