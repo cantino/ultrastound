@@ -5,22 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script>
       // Constants you can change:
-      let hz = 18000;
-      let numStd = 4;
-      let ticksRequiredForDetection = 25;
-      let fireflyPeriod = 300;
+      let hz = 20000;
+      let timeRequiredForDetection = 100;
 
       // Other state
       let bucket = -1;
+      let fireflyPeriod = 2000;
       let audioCtx = null;
       let analyser = null;
       let source = null;
       let state = null;
-      let threshold = 256 * 0.6;
-      let fireflyTime = Math.random() * fireflyPeriod;
+      let fireflyFlashAt = null;
+      let lastFlash = 0;
+      let musicBuffer = null;
+      let musicBufferSource = null;
 
       function setState(newState) {
         state = newState;
+        console.log(state);
         if (state === "Flashing") {
           document.getElementById("body").setAttribute("style", "background-color: #fff");
         } else {
@@ -38,7 +40,10 @@
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = 2048 / 4;
+        analyser.smoothingTimeConstant = 0;
+
+        fireflyFlashAt = Math.random() * fireflyPeriod;
 
         if (navigator.mediaDevices.getUserMedia) {
           navigator.mediaDevices.getUserMedia({audio: true})
@@ -49,11 +54,19 @@
               document.getElementById("setup").setAttribute('disabled', 'disabled');
               document.getElementById("go").removeAttribute('disabled');
 
-              setState("Talking to myself");
-              listen();
-              emit(function() {
-                setState("Calculating threshold");
-              });
+              // Fetch the music
+              const URL = 'trimmed.m4a';
+              window.fetch(URL)
+                .then(response => {
+                  response.arrayBuffer().then(buffer => {
+                    audioCtx.decodeAudioData(buffer, function(ab) {
+                      musicBuffer = ab;
+                      fireflyPeriod = musicBuffer.duration * 1000;
+                      setState("Listening");
+                      listen();
+                    });
+                  });
+                });
             }).catch(function(err) {
               console.log('The following error occurred: ' + err);
             })
@@ -67,11 +80,36 @@
         oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(hz, audioCtx.currentTime); // value in hertz
         oscillator.connect(audioCtx.destination);
-        oscillator.start();
-        setTimeout(function() {
-          oscillator.stop();
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 1); // Stop in 1 second.
+        oscillator.onended = function() {
           if (callback) callback();
-        }, 1000);
+        };
+      }
+
+      function startMusic() {
+        stopMusic();
+        musicBufferSource = audioCtx.createBufferSource();
+        musicBufferSource.buffer = musicBuffer;
+        musicBufferSource.connect(audioCtx.destination);
+        musicBufferSource.start();
+      }
+
+      function stopMusic() {
+        if (musicBufferSource) {
+          musicBufferSource.stop();
+        }
+      }
+
+      function findArgmax(array, start, min) {
+        let max = -1, argmax = -1;
+        for (let i = start; i < array.length; i++) {
+          if (array[i] > min && array[i] > max) {
+            max = array[i];
+            argmax = i
+          }
+        }
+        return argmax;
       }
 
       function listen() {
@@ -87,104 +125,77 @@
         let sum = 0;
         let varSum = 0;
         let ticksAboveThreshold = 0;
-        let argmaxes = {};
+        let previousArgMax = null;
+        let start = null;
+        let peakStart = null;
 
-        function draw() {
+        function draw(timestamp) {
           requestAnimationFrame(draw);
+
+          if (!start) start = timestamp;
+          const now = timestamp - start;
 
           analyser.getByteFrequencyData(dataArray);
 
+          // Draw a frequency domain graph.
           canvasCtx.fillStyle = "rgb(200, 200, 200)";
           canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
           canvasCtx.lineWidth = 2;
           canvasCtx.strokeStyle = "rgb(0, 0, 0)";
-
           canvasCtx.beginPath();
-
           let sliceWidth = canvas.width * 1.0 / bufferLength;
           let x = 0;
-
           for (let i = 0; i < bufferLength; i++) {
             let v = dataArray[i] / 128.0;
             let y = v * canvas.height / 2;
-
             if (i === 0) {
               canvasCtx.moveTo(x, y);
             } else {
               canvasCtx.lineTo(x, y);
             }
-
             x += sliceWidth;
           }
-
           canvasCtx.lineTo(canvas.width, canvas.height / 2);
           canvasCtx.stroke();
 
-          if (state === "Talking to myself") {
-            let max = 0;
-            let argmax = -1;
-            for (let i = Math.floor(bufferLength / 4); i < bufferLength; i++) {
-              if (dataArray[i] > max) {
-                max = dataArray[i];
-                argmax = i;
-              }
-            }
-            argmaxes[argmax] = argmaxes[argmax] || 0;
-            argmaxes[argmax]++;
-          } else if (state === "Calculating threshold") {
-            console.log("Popular buckets: ", argmaxes);
-            let max = -1;
-            Object.keys(argmaxes).forEach(function (argmax) {
-              if (argmaxes[argmax] > max) {
-                max = argmaxes[argmax];
-                bucket = argmax;
-              }
-            });
-            console.log("Detected bucket: ", bucket);
-            setState("Ready");
-            //
-            // count++;
-            // buckets.forEach((bucket) => {
-            //   sum = sum + dataArray[bucket];
-            // });
-            // buckets.forEach((bucket) => {
-            //   varSum = varSum + Math.pow(dataArray[bucket] - (sum / count), 2);
-            // });
-            // // threshold = (sum / count) + numStd * Math.sqrt(varSum / count);
-            // threshold = buckets.length * 256 * 0.6;
-            // console.log("Threshold: ", threshold);
-            //
-            //
-          } else {
-            if (state === "Listening" || state === "Heard a tone") {
-              // Check for tones
-              if (dataArray[bucket] > threshold) {
-                ticksAboveThreshold++;
-                if (state !== "Heard a tone" && ticksAboveThreshold > ticksRequiredForDetection) {
+          // Listen for tones.
+          if (state === "Listening" || state === "Heard a tone") {
+            // Check for tones
+            let argmax = findArgmax(dataArray, Math.floor(bufferLength * 0.3), 256 * 0.4);
+            if (argmax !== -1) {
+              // console.log(argmax);
+              if (peakStart && previousArgMax === argmax) {
+                if (now - peakStart > timeRequiredForDetection && state !== "Heard a tone") {
                   setState("Heard a tone");
-                  fireflyTime = (fireflyPeriod - fireflyTime) / 2.0;
+                  fireflyFlashAt = lastFlash + Math.abs(fireflyFlashAt - now) / 2;
                   console.log("Tone!");
                 }
               } else {
-                setState("Listening");
-                ticksAboveThreshold = 0;
+                if (state !== "Listening") setState("Listening");
+                peakStart = now;
+                previousArgMax = argmax;
               }
+            } else {
+              if (state !== "Listening") setState("Listening");
+              previousArgMax = null;
             }
+          } else {
+            peakStart = null;
+            previousArgMax = null;
+          }
 
-            // Possibly flash
-            fireflyTime++;
-            if (fireflyTime > fireflyPeriod) {
-              fireflyTime = 0;
+          // Possibly flash
+          if (now > fireflyFlashAt) {
+            fireflyFlashAt = now + fireflyPeriod;
+            lastFlash = now;
 
-              if (state === "Listening" || state === "Heard a tone") {
-                setState("Flashing");
-                emit(function () {
-                  setTimeout(function () {
-                    setState("Listening")
-                  }, 250);
-                });
-              }
+            if (state === "Listening" || state === "Heard a tone") {
+              setState("Flashing");
+              stopMusic()
+              emit(function () {
+                startMusic();
+                setState("Listening");
+              });
             }
           }
         }
